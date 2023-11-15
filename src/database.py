@@ -1,3 +1,4 @@
+import importlib
 import re
 from glob import glob
 
@@ -35,17 +36,21 @@ SessionLocal = sessionmaker(bind=engine)
 
 
 def get_all_models():
-    # Import all modules in the models package
-    import pkgutil
-
     # Dynamically discover all classes that inherit from Base
     models = []
-    for loader, module_name, is_pkg in pkgutil.walk_packages(
-        glob("src/*", recursive=True)
-    ):
-        module = loader.find_module(module_name).load_module(module_name)
+    # Iterate through all modules in the project
+    print(glob("src/*/models.py"))
+    for module_name in glob("src/*/models.py"):
+        module_path = module_name.replace("/", ".").rsplit(".", maxsplit=1)[0]
+
+        # Import the module dynamically
+        module = importlib.import_module(module_path, "models")
+
+        # Iterate through all names in the module
         for name in dir(module):
             obj = getattr(module, name)
+
+            # Check if the object is a class inheriting from Base
             if hasattr(obj, "__bases__") and Base in obj.__bases__:
                 models.append(obj)
 
