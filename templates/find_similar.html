@@ -1,0 +1,148 @@
+<!-- templates/index_fastapi.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Snapshot</title>
+    <style>
+        /* Add CSS styles to arrange elements horizontally */
+        #container {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        }
+        
+        .horizontal {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        div {
+            margin-left: 10px;
+            margin-right: 10px;
+        }
+
+        /* Add additional styling for individual elements if needed */
+        #webcam {
+            margin-bottom: 10px; /* Adjust margin as needed */
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Webcam Snapshot</h1>
+
+    <div id="container">
+        <!-- Webcam video feed -->
+        <div class="horizontal">
+            <video id="webcam" width="640" height="480" autoplay muted></video>
+
+            <!-- Snapshot button -->
+            <button onclick="captureAndSend()">Take Snapshot and Send</button>
+        </div>
+        
+        <div class="horizontal">
+             <!-- Display selected image -->
+        <img id="selected-image" src="" alt="Selected Image" style="max-width: 100%; max-height: 300px; display: none;">
+
+        <!-- Display results -->
+        <div id="results"></div>
+        </div>
+       
+    </div>
+    <!-- Webcam video feed -->
+    
+    <script src="https://unpkg.com/htmx.org@1.7.0/dist/htmx.js"></script>
+
+    <script>
+        // Get access to the webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                const video = document.getElementById('webcam');
+                video.srcObject = stream;
+            })
+            .catch((error) => {
+                console.error('Error accessing webcam:', error);
+            });
+
+        // Capture snapshot and send POST request
+        function captureAndSend() {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const video = document.getElementById('webcam');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert canvas content to a data URL
+            const dataURL = canvas.toDataURL('image/jpeg');
+
+            // Convert data URL to Blob
+            const blob = dataURLtoBlob(dataURL);
+
+            // Create a File object from the Blob
+            const file = new File([blob], 'snapshot.jpg', { type: 'image/jpeg' });
+
+            // Display the selected image
+            const selectedImage = document.getElementById('selected-image');
+            selectedImage.src = URL.createObjectURL(file);
+            selectedImage.style.display = 'block';
+
+            // Send POST request
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/faces/unknown/encode', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    request_data = {
+                        threshold: 0.4,
+                        vector: data.vector
+                    }
+
+                    return fetch('/faces/unknown/closest', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(request_data)
+                    });
+                }).then(
+                    response => response.json()
+                )
+                .then(data => {
+                    return fetch(`/users/${data.user_id}`, {
+                        method: 'GET',
+                    })
+                }
+                ).then(response => response.json())
+                .then(data => {
+                    console.log(data)
+                    document.getElementById('results').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                });
+
+        }
+
+        function dataURLtoBlob(dataURL) {
+            const arr = dataURL.split(',');
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new Blob([u8arr], { type: mime });
+        }
+    </script>
+
+</body>
+
+</html>
