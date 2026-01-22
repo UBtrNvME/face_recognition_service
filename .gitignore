@@ -1,0 +1,6 @@
+.envrc
+.direnv
+mise.toml
+.mypy_cache
+.env
+
